@@ -1,0 +1,34 @@
+# Sygnal push gateway configuration (template).
+# Docs: https://github.com/matrix-org/sygnal
+log:
+  setup:
+    version: 1
+    formatters:
+      normal:
+        format: "%(asctime)s [%(process)d] %(levelname)-5s %(name)s %(message)s"
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: normal
+    root:
+      level: INFO
+      handlers: [console]
+
+http:
+  bind_addresses: ["0.0.0.0"]
+  port: 5000
+
+apps:
+  # Expo / FCM (Android). Create a Firebase project for the app and paste the
+  # service-account JSON path or api_key here.
+  com.example.multichat.android:
+    type: gcm
+    api_key: "REPLACE_WITH_FCM_SERVER_KEY"
+
+  # APNs (iOS). Export a key from the Apple Developer portal.
+  com.example.multichat.ios:
+    type: apns
+    keyfile: "/path/to/AuthKey_XXXXXXXXXX.p8"
+    key_id: "XXXXXXXXXX"
+    team_id: "YOUR_TEAM_ID"
+    topic: "com.example.multichat.ios"

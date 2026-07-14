@@ -1,0 +1,91 @@
+# Personal bridge server: Matrix homeserver + one bridge per chat service.
+# Deploy on a small VPS (or home server behind Tailscale). See server/README.md.
+#
+# First-run order:
+#   1. docker compose up synapse        (generate + edit homeserver.yaml)
+#   2. one bridge at a time: generate its config + registration, add the
+#      registration file to homeserver.yaml's app_service_config_files, restart
+#      synapse, then bring the bridge up and log in (QR for WhatsApp).
+#   3. docker compose up -d             (everything)
+
+services:
+  synapse:
+    image: matrixdotorg/synapse:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/synapse:/data
+      - ./config/registrations:/registrations:ro
+    environment:
+      SYNAPSE_SERVER_NAME: ${SERVER_NAME:-chat.example.internal}
+      SYNAPSE_REPORT_STATS: "no"
+    ports:
+      - "8008:8008" # client-server API; keep behind Tailscale/VPN or TLS proxy
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: synapse
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+
+  # WhatsApp — QR-code multi-device pairing (whatsmeow)
+  mautrix-whatsapp:
+    image: dock.mau.dev/mautrix/whatsapp:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/whatsapp:/data
+    depends_on:
+      - synapse
+
+  # Slack — user-token based, the one fully sanctioned integration
+  mautrix-slack:
+    image: dock.mau.dev/mautrix/slack:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/slack:/data
+    depends_on:
+      - synapse
+
+  # LinkedIn messaging — unofficial API, ToS risk acknowledged in PLAN.md
+  mautrix-linkedin:
+    image: dock.mau.dev/mautrix/linkedin:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/linkedin:/data
+    depends_on:
+      - synapse
+
+  # X (Twitter) DMs — unofficial API, historically the flakiest; ship last
+  mautrix-twitter:
+    image: dock.mau.dev/mautrix/twitter:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/twitter:/data
+    depends_on:
+      - synapse
+
+  # Instagram DMs — via Meta's private messaging API
+  mautrix-meta:
+    image: dock.mau.dev/mautrix/meta:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/instagram:/data
+    depends_on:
+      - synapse
+
+  # Push gateway: forwards Matrix notifications to FCM/APNs for the mobile app
+  sygnal:
+    image: matrixdotorg/sygnal:latest
+    restart: unless-stopped
+    volumes:
+      - ./config/sygnal.yaml:/sygnal.yaml:ro
+    ports:
+      - "5000:5000"
+    depends_on:
+      - synapse
