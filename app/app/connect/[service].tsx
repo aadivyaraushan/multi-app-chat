@@ -213,7 +213,7 @@ export default function ConnectScreen() {
               secureTextEntry
               style={[styles.input, { backgroundColor: t.surface, color: t.text }]}
             />
-            <View style={[styles.warning, { backgroundColor: t.surface, borderColor: t.border }]}>
+            <View testID="tos-warning" style={[styles.warning, { backgroundColor: t.surface, borderColor: t.border }]}>
               <Ionicons name="warning-outline" size={18} color="#C77D18" />
               <Text style={{ flex: 1, fontSize: 12, lineHeight: 17, color: t.textSecondary }}>
                 {meta.name} does not offer an official messaging API. This connection uses an
