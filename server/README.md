@@ -48,7 +48,9 @@ mobile app ──HTTPS──▶ Synapse ◀── mautrix-{whatsapp,slack,linked
    docker compose restart synapse && docker compose up -d mautrix-whatsapp
    ```
    Then log in by DMing the bridge bot from any Matrix client:
-   - **WhatsApp**: send `login qr`, scan the QR with WhatsApp → Linked Devices
+   - **WhatsApp**: send `login phone <number>` — the bot returns an 8-character
+     code you enter on your phone via WhatsApp → Linked Devices → Link a Device →
+     "Link with phone number instead"
    - **Slack**: `login token` with a user token
    - **LinkedIn / Twitter / Instagram**: `login` and follow the cookie/credential
      prompts (unofficial APIs — see the risk table in `../PLAN.md`)

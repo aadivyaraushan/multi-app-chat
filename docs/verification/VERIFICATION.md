@@ -16,7 +16,7 @@ cd app && node e2e/verify.js                 # terminal 2 (needs `npm i -D playw
 | # | Capability | Result |
 |---|---|---|
 | 1 | Onboarding: empty inbox shows connect-as-you-go cards for all 5 services | ✅ |
-| 2 | Connect WhatsApp: QR pairing screen and completion flow | ✅ |
+| 2 | Connect WhatsApp: phone-number entry → 8-character pairing code → completion | ✅ |
 | 3 | Connect Slack: token flow, submit gated until token entered | ✅ |
 | 4–6 | Connect LinkedIn / X / Instagram: credential flows with unofficial-API warning | ✅ |
 | 7 | Inbox: merged list, service badges, unread counts, voice-note preview | ✅ |
@@ -49,7 +49,7 @@ cd app && node e2e/verify.js                 # terminal 2 (needs `npm i -D playw
 | | |
 |---|---|
 | ![onboarding](01-onboarding.png) | ![inbox](05-inbox-full.png) |
-| ![qr](02-whatsapp-qr.png) | ![typing](08-typing.png) |
+| ![pairing code](02-whatsapp-pairing-code.png) | ![typing](08-typing.png) |
 | ![actions](09-action-sheet.png) | ![thread](17-thread-view.png) |
 | ![banner](19-banner.png) | ![search](21-search.png) |
 | ![dark](22-dark-inbox.png) | |

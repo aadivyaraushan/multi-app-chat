@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,56 +16,17 @@ import { useChatStore } from '../../src/store/ChatStore';
 import { useTheme } from '../../src/theme';
 import { ServiceId } from '../../src/types';
 
-// Pairing-code pattern rendered while waiting for the bridge to report a scan.
-// Deterministic stand-in for the real QR payload the WhatsApp bridge emits.
-function QrPattern({ seed }: { seed: string }) {
-  const cells = useMemo(() => {
-    const size = 21;
-    let h = 2166136261;
-    for (const ch of seed) {
-      h ^= ch.charCodeAt(0);
-      h = Math.imul(h, 16777619);
-    }
-    const out: boolean[] = [];
-    for (let i = 0; i < size * size; i++) {
-      h ^= h << 13;
-      h ^= h >>> 17;
-      h ^= h << 5;
-      out.push((h & 3) === 0 ? false : (h & 1) === 1);
-    }
-    // corner finder squares
-    const finder = (r0: number, c0: number) => {
-      for (let r = 0; r < 7; r++)
-        for (let c = 0; c < 7; c++) {
-          const edge = r === 0 || r === 6 || c === 0 || c === 6;
-          const core = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-          out[(r0 + r) * size + (c0 + c)] = edge || core;
-        }
-    };
-    finder(0, 0);
-    finder(0, size - 7);
-    finder(size - 7, 0);
-    return { cells: out, size };
-  }, [seed]);
+// WhatsApp "link with phone number" codes are 8 characters, shown as two
+// groups of four. Excludes visually ambiguous glyphs (0/O, 1/I) as WhatsApp does.
+function makePairingCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return `${s.slice(0, 4)}-${s.slice(4)}`;
+}
 
-  return (
-    <View style={styles.qrBox} testID="whatsapp-qr">
-      {Array.from({ length: cells.size }).map((_, r) => (
-        <View key={r} style={{ flexDirection: 'row' }}>
-          {Array.from({ length: cells.size }).map((__, c) => (
-            <View
-              key={c}
-              style={{
-                width: 9,
-                height: 9,
-                backgroundColor: cells.cells[r * cells.size + c] ? '#111' : '#FFF',
-              }}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
-  );
+function digitsOnly(s: string): string {
+  return s.replace(/[^\d]/g, '');
 }
 
 export default function ConnectScreen() {
@@ -78,6 +39,8 @@ export default function ConnectScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
+  const [phone, setPhone] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
 
   const meta = service ? SERVICES[service] : undefined;
   if (!meta) {
@@ -101,8 +64,16 @@ export default function ConnectScreen() {
     }, 700);
   };
 
+  const phoneValid = digitsOnly(phone).length >= 8;
+
+  const requestCode = () => {
+    // The real bridge returns this code from `login phone <number>`; here we
+    // generate one locally so the pairing UX can be exercised end-to-end.
+    setPairingCode(makePairingCode());
+  };
+
   const credentialsValid =
-    meta.connectKind === 'qr' ||
+    meta.connectKind === 'pairing' ||
     (meta.connectKind === 'token' ? token.trim().length > 0 : username.trim().length > 0 && password.trim().length > 0);
 
   return (
@@ -125,32 +96,83 @@ export default function ConnectScreen() {
               {meta.name} is connected
             </Text>
           </View>
-        ) : meta.connectKind === 'qr' ? (
-          <>
-            <Text style={[styles.instructions, { color: t.textSecondary }]}>
-              1. Open WhatsApp on your phone{'\n'}
-              2. Tap Settings → Linked Devices → Link a Device{'\n'}
-              3. Point your phone at this code
-            </Text>
-            <View style={styles.centered}>
-              <QrPattern seed={`multichat-${Date.now() % 100000}`} />
-              <Text style={{ color: t.textTertiary, fontSize: 12, marginTop: 10 }}>
-                Code refreshes automatically while pairing
+        ) : meta.connectKind === 'pairing' ? (
+          !pairingCode ? (
+            // Step 1 — phone number entry
+            <>
+              <Text style={[styles.instructions, { color: t.textSecondary }]}>
+                Enter the phone number for this WhatsApp account, including its
+                country code. We'll give you an 8-character code to type into
+                WhatsApp on your phone.
               </Text>
-            </View>
-            <Pressable
-              testID="qr-scanned-btn"
-              onPress={finish}
-              disabled={busy}
-              style={[styles.primaryBtn, { backgroundColor: meta.brandColor }]}
-            >
-              {busy ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.primaryBtnText}>I've scanned the code</Text>
-              )}
-            </Pressable>
-          </>
+              <TextInput
+                testID="phone-input"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+1 555 123 4567"
+                placeholderTextColor={t.textTertiary}
+                keyboardType="phone-pad"
+                style={[styles.input, { backgroundColor: t.surface, color: t.text }]}
+              />
+              <Pressable
+                testID="request-code-btn"
+                onPress={requestCode}
+                disabled={!phoneValid}
+                style={[
+                  styles.primaryBtn,
+                  { backgroundColor: phoneValid ? meta.brandColor : t.chipBg },
+                ]}
+              >
+                <Text style={[styles.primaryBtnText, !phoneValid && { color: t.textTertiary }]}>
+                  Get pairing code
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            // Step 2 — show the 8-character code to enter on the phone
+            <>
+              <Text style={[styles.instructions, { color: t.textSecondary }]}>
+                On your phone: open WhatsApp → Settings → Linked Devices → Link a
+                Device → <Text style={{ fontWeight: '700' }}>Link with phone number instead</Text>,
+                then enter this code:
+              </Text>
+              <View style={styles.centered}>
+                <View
+                  testID="whatsapp-pairing-code"
+                  style={[styles.codeBox, { backgroundColor: t.surface, borderColor: t.border }]}
+                >
+                  <Text style={[styles.codeText, { color: t.text }]}>{pairingCode}</Text>
+                </View>
+                <Text style={{ color: t.textTertiary, fontSize: 12, marginTop: 10 }}>
+                  Code expires after a minute. Request a new one if it times out.
+                </Text>
+              </View>
+              <Pressable
+                testID="code-entered-btn"
+                onPress={finish}
+                disabled={busy}
+                style={[styles.primaryBtn, { backgroundColor: meta.brandColor }]}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>I've entered the code</Text>
+                )}
+              </Pressable>
+              <Pressable
+                testID="change-number-btn"
+                onPress={() => {
+                  setPairingCode('');
+                  setPhone('');
+                }}
+                style={styles.secondaryBtn}
+              >
+                <Text style={{ color: t.accent, fontSize: 14, fontWeight: '600' }}>
+                  Use a different number
+                </Text>
+              </Pressable>
+            </>
+          )
         ) : meta.connectKind === 'token' ? (
           <>
             <Text style={[styles.instructions, { color: t.textSecondary }]}>
@@ -284,10 +306,21 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 10,
   },
-  qrBox: {
-    padding: 12,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
+  codeBox: {
+    paddingHorizontal: 28,
+    paddingVertical: 20,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  codeText: {
+    fontSize: 40,
+    fontWeight: '800',
+    letterSpacing: 6,
+    fontVariant: ['tabular-nums'],
+  },
+  secondaryBtn: {
+    alignItems: 'center',
+    paddingVertical: 10,
   },
   input: {
     borderRadius: 12,

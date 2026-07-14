@@ -91,12 +91,19 @@ async function shot(name) {
     await shot('01-onboarding');
   });
 
-  // ---------- 2. WhatsApp QR connect ----------
-  await check('connect whatsapp: QR pairing screen and flow', async () => {
+  // ---------- 2. WhatsApp phone-number pairing-code connect ----------
+  await check('connect whatsapp: 8-character pairing-code flow', async () => {
     await page.click(tid('connect-card-whatsapp'));
-    await page.waitForSelector(tid('whatsapp-qr'), { timeout: 10000 });
-    await shot('02-whatsapp-qr');
-    await page.click(tid('qr-scanned-btn'));
+    await page.waitForSelector(tid('phone-input'), { timeout: 10000 });
+    // request-code button gated until a valid phone number is entered
+    if (await page.locator(tid('whatsapp-pairing-code')).count()) throw new Error('code shown before phone entry');
+    await page.fill(tid('phone-input'), '+1 555 123 4567');
+    await page.click(tid('request-code-btn'));
+    await page.waitForSelector(tid('whatsapp-pairing-code'), { timeout: 10000 });
+    const code = (await page.locator(tid('whatsapp-pairing-code')).innerText()).trim();
+    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error(`unexpected code format: ${code}`);
+    await shot('02-whatsapp-pairing-code');
+    await page.click(tid('code-entered-btn'));
     await page.waitForSelector(tid('convo-wa-mom'), { timeout: 10000 });
   });
 

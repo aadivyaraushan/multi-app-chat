@@ -41,7 +41,7 @@ These were reviewed and approved during planning:
 │  └───────────┬───────────┘  │
 │  ┌───────────┴───────────┐  │
 │  │ mautrix bridges       │  │
-│  │  • mautrix-whatsapp   │──┼──→ WhatsApp multi-device (QR pairing) ✅ official-protocol-adjacent
+│  │  • mautrix-whatsapp   │──┼──→ WhatsApp multi-device (phone-code pairing) ✅ official-protocol-adjacent
 │  │  • mautrix-slack      │──┼──→ Slack (real API / user token)      ✅ sanctioned
 │  │  • mautrix-linkedin   │──┼──→ LinkedIn messaging (unofficial)    ⚠️ ToS risk
 │  │  • mautrix-twitter    │──┼──→ X DMs (unofficial)                 ⚠️ ToS risk
@@ -55,7 +55,7 @@ These were reviewed and approved during planning:
 
 ### Why Matrix + mautrix bridges (rather than reverse-engineering five protocols yourself)
 
-- The mautrix bridge family already solves the hardest problem — maintained, battle-tested unofficial clients for exactly these services, including **WhatsApp QR-code multi-device pairing** (via whatsmeow), which was a hard requirement.
+- The mautrix bridge family already solves the hardest problem — maintained, battle-tested unofficial clients for exactly these services, including **WhatsApp multi-device pairing via an 8-character phone code** (via whatsmeow), which was a hard requirement.
 - Matrix gives you for free: a unified message model (rooms, events, reactions, replies, media), end-to-end sync across devices, read receipts, typing indicators where available, and a push-notification pipeline (Sygnal).
 - When a service changes its private API and breaks, you update one bridge container instead of debugging your own protocol code. This is the whole maintenance story for a personal project.
 - The mobile app becomes "just" a Matrix client with a heavily opinionated UI — which is where all the differentiated work (the UX) should go anyway.
@@ -65,7 +65,7 @@ These were reviewed and approved during planning:
 | Component | Choice | Notes |
 |---|---|---|
 | Homeserver | Synapse | Best bridge compatibility and docs; fine at personal scale |
-| WhatsApp | mautrix-whatsapp | QR pairing from the phone, like WhatsApp Web — matches requirement 2.5 exactly |
+| WhatsApp | mautrix-whatsapp | 8-character phone-code pairing (Link with phone number instead) — no camera/QR needed |
 | Slack | mautrix-slack | Uses your user token; the one fully sanctioned integration |
 | LinkedIn | mautrix-linkedin | Cookie/credential-based; unofficial |
 | X | mautrix-twitter | Cookie-based; unofficial. Highest breakage risk of the five — see Risks |
@@ -102,7 +102,7 @@ The entire app is four screens. That is the point.
 
 **③ Accounts & Settings** (via avatar tap)
 - Connected services list with status (connected / reconnect needed) and a Connect button for missing ones.
-- WhatsApp connect flow: server generates pairing QR → shown in-app → scan with phone's WhatsApp (Linked Devices). Slack: token/OAuth flow. LinkedIn/X/IG: credential or cookie entry with a plain-language note about unofficial-API risk.
+- WhatsApp connect flow: enter the account's phone number → server returns an 8-character code → type it into the phone's WhatsApp (Linked Devices → Link a Device → "Link with phone number instead"). Slack: token/OAuth flow. LinkedIn/X/IG: credential or cookie entry with a plain-language note about unofficial-API risk.
 - **Notifications:** master toggle → per-service toggles → (per-chat mute lives on the chat itself). Quiet-hours toggle.
 - Appearance: light/dark/system.
 
@@ -146,13 +146,13 @@ Out of scope for v1: calls, stories/status, posting, Slack huddles, channels-you
 ## 5. Build phases
 
 **Phase 0 — Bridge server up (≈ a weekend)**
-Provision VPS → Docker Compose with Synapse + mautrix-whatsapp + mautrix-slack → pair WhatsApp via QR, connect Slack → verify messages flow using any existing Matrix client (Element) as a throwaway UI. *Proves the whole architecture before writing any app code.*
+Provision VPS → Docker Compose with Synapse + mautrix-whatsapp + mautrix-slack → pair WhatsApp via phone code, connect Slack → verify messages flow using any existing Matrix client (Element) as a throwaway UI. *Proves the whole architecture before writing any app code.*
 
 **Phase 1 — App MVP: inbox + chat (2–3 weeks of evenings)**
 Expo app with matrix-js-sdk: merged inbox with two-line rows + service badges, chat screen with the shared core (text, images, replies, reactions), filter chips, dark/light. WhatsApp + Slack only.
 
 **Phase 2 — Remaining bridges + onboarding (1–2 weeks)**
-Add mautrix-linkedin, mautrix-twitter, mautrix-meta. Build the connect-as-you-go cards and each service's connect flow (QR screen for WhatsApp done in Phase 1 testing, credential flows for the rest).
+Add mautrix-linkedin, mautrix-twitter, mautrix-meta. Build the connect-as-you-go cards and each service's connect flow (phone-code screen for WhatsApp done in Phase 1 testing, credential flows for the rest).
 
 **Phase 3 — Notifications + polish (1–2 weeks)**
 Sygnal + FCM/APNs push, per-service toggles, per-chat mute, search, swipe actions, Slack thread view, typing/read indicators, empty/error/reconnect states.
@@ -168,7 +168,7 @@ Daily-drive it; likely follow-ups: voice notes, media gallery per chat, pinned c
 |---|---|---|
 | Account bans on LinkedIn / X / IG (unofficial API use violates their ToS) | High | Personal-scale usage patterns look like a normal single user; keep session behavior conservative (no polling storms — bridges are event-driven). Accept the risk consciously; it's your account. |
 | X bridge breakage (X aggressively churns its private API; mautrix-twitter has historically lagged) | High | Treat X as the flakiest integration; ship it last, degrade gracefully (service shows "reconnect needed", rest of app unaffected). |
-| WhatsApp device-pairing eviction (linked devices get logged out occasionally) | Medium | Reconnect-needed state + notification prompting a re-scan; bridge retains history. |
+| WhatsApp device-pairing eviction (linked devices get logged out occasionally) | Medium | Reconnect-needed state + notification prompting a re-pair (new phone code); bridge retains history. |
 | Bridge/homeserver maintenance burden | Medium | Docker Compose + watchtower-style updates; everything is containers on one box. |
 | Meta (IG) login challenges / checkpoint loops | Medium | mautrix-meta handles most flows; fallback is re-entering a fresh session cookie. |
 | Server compromise = all five accounts compromised | Medium | Tailscale-only access, no federation, disk encryption, standard hardening. |

@@ -11,8 +11,8 @@ export const SERVICES: Record<ServiceId, ServiceMeta> = {
     shortName: 'WhatsApp',
     brandColor: '#25D366',
     badgeGlyph: 'W',
-    connectKind: 'qr',
-    connectHint: 'Scan a QR code from your phone, like WhatsApp Web.',
+    connectKind: 'pairing',
+    connectHint: 'Enter an 8-character code on your phone — no QR scan needed.',
     capabilities: {
       reactions: true,
       replies: true,

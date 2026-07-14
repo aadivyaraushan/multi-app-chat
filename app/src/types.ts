@@ -17,7 +17,7 @@ export interface ServiceMeta {
   brandColor: string;
   badgeGlyph: string;
   capabilities: ServiceCapabilities;
-  connectKind: 'qr' | 'token' | 'credentials';
+  connectKind: 'pairing' | 'token' | 'credentials';
   connectHint: string;
 }
 
