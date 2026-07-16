@@ -145,6 +145,18 @@ Out of scope for v1: calls, stories/status, posting, Slack huddles, channels-you
 
 ## 5. Build phases
 
+**Implementation status (as of this branch):** The full app UI is built and
+verified (30/30 browser checks, `docs/verification/`). The data layer now sits
+behind a `ChatProvider` seam (`app/src/providers/`): `MockProvider` powers the
+seeded demo and the e2e suite, and `MatrixProvider` (matrix-js-sdk) implements
+the live path — service detection via the mautrix `m.bridge` state event,
+message/reply/thread/reaction sync, send, read receipts, unread, typing, and the
+bridge-bot login flows. `MatrixProvider` is verified end-to-end against a real
+Synapse homeserver (11/11, `app/e2e/matrix-provider.verify.ts`). What remains for
+a fully live app: stand up `server/` with real bridges (Phase 0), point the app
+at it via `EXPO_PUBLIC_MATRIX_BASE_URL`, and exercise a real WhatsApp phone-code
+pairing against the live bridge.
+
 **Phase 0 — Bridge server up (≈ a weekend)**
 Provision VPS → Docker Compose with Synapse + mautrix-whatsapp + mautrix-slack → pair WhatsApp via phone code, connect Slack → verify messages flow using any existing Matrix client (Element) as a throwaway UI. *Proves the whole architecture before writing any app code.*
 

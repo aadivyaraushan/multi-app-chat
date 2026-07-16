@@ -16,15 +16,6 @@ import { useChatStore } from '../../src/store/ChatStore';
 import { useTheme } from '../../src/theme';
 import { ServiceId } from '../../src/types';
 
-// WhatsApp "link with phone number" codes are 8 characters, shown as two
-// groups of four. Excludes visually ambiguous glyphs (0/O, 1/I) as WhatsApp does.
-function makePairingCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s = '';
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return `${s.slice(0, 4)}-${s.slice(4)}`;
-}
-
 function digitsOnly(s: string): string {
   return s.replace(/[^\d]/g, '');
 }
@@ -34,7 +25,7 @@ export default function ConnectScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { service } = useLocalSearchParams<{ service: ServiceId }>();
-  const { connectService, connectedServices } = useChatStore();
+  const { connectService, requestPairingCode, connectedServices } = useChatStore();
   const [busy, setBusy] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -53,23 +44,35 @@ export default function ConnectScreen() {
 
   const connected = connectedServices.includes(meta.id);
 
-  const finish = () => {
+  const finish = async () => {
     setBusy(true);
-    // In the seeded provider the "bridge" links instantly; the Matrix provider
-    // will resolve this when the bridge confirms the session.
-    setTimeout(() => {
-      connectService(meta.id);
-      setBusy(false);
+    // The bridge confirms the session; for WhatsApp the pairing code has already
+    // been requested, the other services pass their credentials here.
+    const creds =
+      meta.connectKind === 'token'
+        ? { token: token.trim() }
+        : meta.connectKind === 'credentials'
+          ? { username: username.trim(), password }
+          : {};
+    try {
+      await connectService(meta.id, creds);
       router.back();
-    }, 700);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const phoneValid = digitsOnly(phone).length >= 8;
 
-  const requestCode = () => {
-    // The real bridge returns this code from `login phone <number>`; here we
-    // generate one locally so the pairing UX can be exercised end-to-end.
-    setPairingCode(makePairingCode());
+  const requestCode = async () => {
+    setBusy(true);
+    try {
+      // The bridge returns this code from `login phone <number>`.
+      const code = await requestPairingCode(meta.id, phone.trim());
+      setPairingCode(code);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const credentialsValid =
@@ -117,15 +120,19 @@ export default function ConnectScreen() {
               <Pressable
                 testID="request-code-btn"
                 onPress={requestCode}
-                disabled={!phoneValid}
+                disabled={!phoneValid || busy}
                 style={[
                   styles.primaryBtn,
                   { backgroundColor: phoneValid ? meta.brandColor : t.chipBg },
                 ]}
               >
-                <Text style={[styles.primaryBtnText, !phoneValid && { color: t.textTertiary }]}>
-                  Get pairing code
-                </Text>
+                {busy ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={[styles.primaryBtnText, !phoneValid && { color: t.textTertiary }]}>
+                    Get pairing code
+                  </Text>
+                )}
               </Pressable>
             </>
           ) : (
